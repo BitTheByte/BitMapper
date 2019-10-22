@@ -2,6 +2,7 @@ from burp import IBurpExtender
 from burp import IHttpListener
 from burp import ITab
 import sys
+import re
 
 class BurpExtender(IBurpExtender, IHttpListener, ITab):
 
@@ -28,11 +29,13 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
         body = request[requestInfo.getBodyOffset():]
         headers = requestInfo.getHeaders()
 
-        if str(messageInfo.url)[-2::] != "js": return 
+        if str(messageInfo.url)[-3::] != ".js": return
+        if "sourceMappingURL" in bytes(bytearray(body)):
+            print("[DEBUG] Found sourceMappingURL :: " + unicode(messageInfo.url))
+            return
 
-        print "JS"
+        print("[DEBUG] Appending sourceMappingURL :: " + unicode(messageInfo.url))
         payload = u"//# sourceMappingURL=" + unicode(messageInfo.url) + u".map"
-
         for i,header in enumerate(headers):
             if "Content-Length" in header:
                 headers[i] = "Content-Length: " + str( int(header.split(":")[1].strip()) + len(payload) )
