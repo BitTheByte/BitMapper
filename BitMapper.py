@@ -20,31 +20,47 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
         print("Loaded!")
         return
 
+    def rm_integrity(self,body):
+        for integrity in re.findall('integrity="(.*?)"',body):
+            body = re.sub(integrity,'',body)
+        return body
+
+    def build_response(self,headers,content_length):
+        for i,header in enumerate(headers):
+            if not "Content-Length" in header:
+                    continue
+            headers[i] = "Content-Length: " + str( content_length )
+
+        httpRequest = bytearray()
+        httpRequest += bytearray('\r\n'.join(headers).encode("utf8"))
+        httpRequest += bytearray('\r\n'*2)
+        return httpRequest
+
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
         if messageIsRequest:
             return
 
-        request = messageInfo.getResponse()
-        requestInfo = self.helpers.analyzeResponse(request)
-        body = request[requestInfo.getBodyOffset():]
-        headers = requestInfo.getHeaders()
+        request      = messageInfo.getResponse()
+        requestInfo  = self.helpers.analyzeResponse(request)
+        body         = request[requestInfo.getBodyOffset():]
+        headers      = requestInfo.getHeaders()
 
-        if str(messageInfo.url)[-3::] != ".js": return
+        if str(messageInfo.url)[-3::] != ".js":
+            body     = self.rm_integrity(body)
+            response = self.build_response(headers,len(body))
+            response += bytearray(body)
+            messageInfo.setResponse( bytes(response) )
+            return
+            
         if "sourceMappingURL" in bytes(bytearray(body)):
             print("[DEBUG] Found sourceMappingURL :: " + unicode(messageInfo.url))
             return
 
-        print("[DEBUG] Appending sourceMappingURL :: " + unicode(messageInfo.url))
-        payload = u"//# sourceMappingURL=" + unicode(messageInfo.url) + u".map"
-        for i,header in enumerate(headers):
-            if "Content-Length" in header:
-                headers[i] = "Content-Length: " + str( int(header.split(":")[1].strip()) + len(payload) )
+        payload = u"//# sourceMappingURL=" + unicode(messageInfo.url) + u".map" + u"\n//edited_by_bitmapper"
+        response =  self.build_response(headers, len(body) + len(payload) )
+        response += bytearray(body)
+        response += bytearray(payload.encode("utf8"))
+        messageInfo.setResponse( bytes(response) )
 
-        httpRequest = bytearray()
-        httpRequest += bytearray('\n'.join(headers).encode("utf8"))
-        httpRequest += bytearray('\n\n')
-        httpRequest += bytearray(body)
-        httpRequest += bytearray(payload.encode("utf8"))
-        messageInfo.setResponse( bytes(httpRequest) )
-
+        print("[DEBUG] Appended sourceMappingURL :: " + unicode(messageInfo.url))
         return
