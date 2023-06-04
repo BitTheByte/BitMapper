@@ -27,9 +27,9 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
 
     def build_response(self,headers,content_length):
         for i,header in enumerate(headers):
-            if not "Content-Length" in header:
-                    continue
-            headers[i] = "Content-Length: " + str( content_length )
+            if "Content-Length" not in header:
+                continue
+            headers[i] = f"Content-Length: {str(content_length)}"
 
         httpRequest = bytearray()
         httpRequest += bytearray('\r\n'.join(headers).encode("utf8"))
@@ -51,16 +51,19 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
             response += bytearray(body)
             messageInfo.setResponse( bytes(response) )
             return
-            
+
         if "sourceMappingURL" in bytes(bytearray(body)):
-            print("[DEBUG] Found sourceMappingURL :: " + unicode(messageInfo.url))
+            print(f"[DEBUG] Found sourceMappingURL :: {unicode(messageInfo.url)}")
             return
 
-        payload = u"//# sourceMappingURL=" + unicode(messageInfo.url) + u".map" + u"\n//edited_by_bitmapper"
+        payload = (
+            f"//# sourceMappingURL={unicode(messageInfo.url)}.map"
+            + u"\n//edited_by_bitmapper"
+        )
         response =  self.build_response(headers, len(body) + len(payload) )
         response += bytearray(body)
         response += bytearray(payload.encode("utf8"))
         messageInfo.setResponse( bytes(response) )
 
-        print("[DEBUG] Appended sourceMappingURL :: " + unicode(messageInfo.url))
+        print(f"[DEBUG] Appended sourceMappingURL :: {unicode(messageInfo.url)}")
         return
