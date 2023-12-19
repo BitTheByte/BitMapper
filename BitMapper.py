@@ -1,8 +1,8 @@
+import sys
+import re
 from burp import IBurpExtender
 from burp import IHttpListener
 from burp import ITab
-import sys
-import re
 
 class BurpExtender(IBurpExtender, IHttpListener, ITab):
 
@@ -14,7 +14,7 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
 
         # Redirect the stdout to burp stdout
         sys.stdout = self.callbacks.getStdout()
-        
+
         # Saving IExtensionHelpers to use later
         self.helpers = self.callbacks.getHelpers()
         print("Loaded!")
@@ -29,11 +29,12 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
         for i,header in enumerate(headers):
             if "Content-Length" not in header:
                 continue
-            headers[i] = f"Content-Length: {str(content_length)}"
+            headers[i] = "Content-Length: {}".format(str(content_length))
 
         httpRequest = bytearray()
         httpRequest += bytearray('\r\n'.join(headers).encode("utf8"))
         httpRequest += bytearray('\r\n'*2)
+
         return httpRequest
 
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
@@ -53,11 +54,11 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
             return
 
         if "sourceMappingURL" in bytes(bytearray(body)):
-            print(f"[DEBUG] Found sourceMappingURL :: {unicode(messageInfo.url)}")
+            print("[DEBUG] Found sourceMappingURL :: {}".format(unicode(messageInfo.url)))
             return
 
         payload = (
-            f"//# sourceMappingURL={unicode(messageInfo.url)}.map"
+            "//# sourceMappingURL={}.map".format(unicode(messageInfo.url))
             + u"\n//edited_by_bitmapper"
         )
         response =  self.build_response(headers, len(body) + len(payload) )
@@ -65,5 +66,5 @@ class BurpExtender(IBurpExtender, IHttpListener, ITab):
         response += bytearray(payload.encode("utf8"))
         messageInfo.setResponse( bytes(response) )
 
-        print(f"[DEBUG] Appended sourceMappingURL :: {unicode(messageInfo.url)}")
+        print("[DEBUG] Appended sourceMappingURL :: {}".format(unicode(messageInfo.url)))
         return
